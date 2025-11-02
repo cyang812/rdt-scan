@@ -23,6 +23,18 @@ RDTScan uses a feature-matching approach for RDT recognition, allowing RDTScan t
 * This library requires that target smartphone's support Android's [Camera2 API](https://developer.android.com/reference/android/hardware/camera2/package-summary), which supports control over the camera's hardware.
 
 # Installation
+
+## Requirements
+**Updated as of 2024:** This project has been modernized to work with current Android development tools:
+* **Android Studio:** Iguana (2023.2.1) or later recommended
+* **JDK:** 17 or later (required for Gradle 8.7)
+* **Android SDK:** API 34 (Android 14) - compile target
+* **Minimum Android Version:** API 21 (Android 5.0 Lollipop)
+* **NDK:** Required for native C++ code (CMake)
+
+See [MIGRATION_NOTES.md](MIGRATION_NOTES.md) for details on recent modernization changes.
+
+## Setup
 RDTScan utilizes [OpenCV for Android](https://opencv.org/android/) for many of the image processing steps, which in turn relies on Android's [Native Development Kit (NDK)](https://developer.android.com/ndk/). Therefore, it is beyond the scope of the current project to export RDTScan's functionality as a `.jar` file. Instead, there are two options for getting started with RDTScan:
 * **No existing project:** If you are making a smartphone app from scratch, you can simply clone the repository directly and build your app on top of what has already been provided. This repository has all of the dependencies properly configured along with a fully-functioning app that developers can use to get started.
 * **Existing project:** If you have a smartphone app that has already been made and you are looking to add RDTScan to it, you will still need to add OpenCV for Android to your project. The [official tutorial](https://docs.opencv.org/2.4/doc/tutorials/introduction/android_binary_package/O4A_SDK.html) for doing this is fairly outdated, but there are plenty of other tutorials out there depending on your environment. Once you have done that, copy the following folders and files to your project (at the same path):
@@ -30,6 +42,24 @@ RDTScan utilizes [OpenCV for Android](https://opencv.org/android/) for many of t
   * [`src/.../utils/*`](app/src/main/java/edu/washington/cs/ubicomplab/rdt_reader/utils)
   * [`src/.../views/*`](app/src/main/java/edu/washington/cs/ubicomplab/rdt_reader/views)
   * [`assets/config.json`](app/src/main/assets/config.json)
+
+## Building the Project
+
+Once you have cloned the repository and installed the requirements, you can build the project:
+
+```bash
+# Build the debug APK
+./gradlew assembleDebug
+
+# Build the release APK
+./gradlew assembleRelease
+
+# Run tests
+./gradlew test
+
+# Install on connected device
+./gradlew installDebug
+```
 
 ### Troubleshooting:
 * **Unable to locate NDK installation** If you have not already installed NDK, follow the instructions at this [link](https://developer.android.com/studio/projects/install-ndk) to do so. Once that is done, NDK should be installed at a path that either looks like `C:/Users/username/AppData/Local/Android/ndk/xx.x.xxxxxxx` (Windows) or `/Users/username/Library/Android/sdk/ndk/xx.x.xxxxxxx` (OSX). Referring to this filepath as `NDK_HOME`, there are two ways to point your project to this filepath: 
