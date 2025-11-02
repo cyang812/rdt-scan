@@ -16,9 +16,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.net.Uri;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -178,15 +178,23 @@ public class MainActivity extends AppCompatActivity implements
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_settings:
-                // Go to the settings page
-                SettingsDialogFragment dialog = new SettingsDialogFragment();
-                dialog.show(getFragmentManager(), "Setting Dialog");
-                return true;
-            default:
-                return false;
+//        switch (item.getItemId()) {
+//            case R.id.action_settings:
+//                // Go to the settings page
+//                SettingsDialogFragment dialog = new SettingsDialogFragment();
+//                dialog.show(getFragmentManager(), "Setting Dialog");
+//                return true;
+//            default:
+//                return false;
+//        }
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            // Go to the settings page
+            SettingsDialogFragment dialog = new SettingsDialogFragment();
+            dialog.show(getFragmentManager(), "Setting Dialog");
+            return true;
         }
+        return false;
     }
 
     /**

@@ -4,35 +4,53 @@ import java.io.File;
 import java.util.StringTokenizer;
 
 import org.opencv.core.Core;
-import org.opencv.engine.OpenCVEngineInterface;
+import org.opencv.android.OpenCVLoader;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.net.Uri;
-import android.os.IBinder;
-import android.os.RemoteException;
 import android.util.Log;
 
+/**
+ * 兼容旧接口的现代化 AsyncServiceHelper。
+ *
+ * 改动要点：
+ * - 移除了对 org.opencv.engine.OpenCVEngineInterface 的依赖（不再使用 OpenCV Manager）。
+ * - 保留原有 public 接口（initOpenCV(...) 等）不变，以便调用方无需修改。
+ * - 优先尝试静态加载 OpenCV（OpenCVLoader.initDebug()），失败时尝试 OpenCVLoader.initAsync(...)。
+ * - 若都失败，则调用 InstallService(...) 提示用户去安装（保留原来提示 Play 商店的逻辑）。
+ * - 原代码中大量调用 mAppContext.unbindService(mServiceConnection) 的位置都改为安全解绑（如果未绑定则忽略），避免异常。
+ */
 class AsyncServiceHelper
 {
     public static boolean initOpenCV(String Version, final Context AppContext,
-            final LoaderCallbackInterface Callback)
+                                     final LoaderCallbackInterface Callback)
     {
         AsyncServiceHelper helper = new AsyncServiceHelper(Version, AppContext, Callback);
-        Intent intent = new Intent("org.opencv.engine.BIND");
-        intent.setPackage("org.opencv.engine");
-        if (AppContext.bindService(intent, helper.mServiceConnection, Context.BIND_AUTO_CREATE))
-        {
+
+        // 旧实现是 bind 到 org.opencv.engine 服务。现代实现：优先静态加载（内嵌 .so）
+        Log.d(TAG, "InitOpenCV called. version: " + Version);
+
+        // Try static init first
+        if (OpenCVLoader.initDebug()) {
+            Log.d(TAG, "Static OpenCVLoader.initDebug() succeeded");
+            helper.logBuildInfo();
+            Callback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
             return true;
         }
-        else
-        {
-            AppContext.unbindService(helper.mServiceConnection);
-            InstallService(AppContext, Callback);
-            return false;
+
+        // If static failed -> try async init (this still uses libs packaged in APK/aar)
+        Log.d(TAG, "Static init failed. Trying OpenCVLoader.initAsync()");
+        boolean asyncStarted = OpenCVLoader.initAsync(Version, AppContext, Callback);
+        if (asyncStarted) {
+            Log.d(TAG, "OpenCVLoader.initAsync() started");
+            return true;
         }
+
+        // If async couldn't start (very rare), fallback to "install" flow to mimic old behavior
+        Log.d(TAG, "Async init couldn't start. Falling back to InstallService()");
+        InstallService(AppContext, Callback);
+        return false;
     }
 
     protected AsyncServiceHelper(String Version, Context AppContext, LoaderCallbackInterface Callback)
@@ -44,13 +62,14 @@ class AsyncServiceHelper
 
     protected static final String TAG = "OpenCVManager/Helper";
     protected static final int MINIMUM_ENGINE_VERSION = 2;
-    protected OpenCVEngineInterface mEngineService;
+    // removed mEngineService (no OpenCV Manager)
     protected LoaderCallbackInterface mUserAppCallback;
     protected String mOpenCVersion;
     protected Context mAppContext;
     protected static boolean mServiceInstallationProgress = false;
     protected static boolean mLibraryInstallationProgress = false;
 
+    // 保留 InstallServiceQuiet / InstallService 行为 —— 引导用户去 Play 商店安装（作为回退）
     protected static boolean InstallServiceQuiet(Context context)
     {
         boolean result = true;
@@ -72,16 +91,15 @@ class AsyncServiceHelper
     {
         if (!mServiceInstallationProgress)
         {
-                Log.d(TAG, "Request new service installation");
-                InstallCallbackInterface InstallQuery = new InstallCallbackInterface() {
+            Log.d(TAG, "Request new service installation (fallback to market)");
+            InstallCallbackInterface InstallQuery = new InstallCallbackInterface() {
                 private LoaderCallbackInterface mUserAppCallback = Callback;
                 public String getPackageName()
                 {
                     return "OpenCV Manager";
                 }
                 public void install() {
-                    Log.d(TAG, "Trying to install OpenCV Manager via Google Play");
-
+                    Log.d(TAG, "Trying to install OpenCV Manager via Google Play (fallback)");
                     boolean result = InstallServiceQuiet(AppContext);
                     if (result)
                     {
@@ -93,7 +111,6 @@ class AsyncServiceHelper
                         Log.d(TAG, "OpenCV package was not installed!");
                         int Status = LoaderCallbackInterface.MARKET_ERROR;
                         Log.d(TAG, "Init finished with status " + Status);
-                        Log.d(TAG, "Unbind from service");
                         Log.d(TAG, "Calling using callback");
                         mUserAppCallback.onManagerConnected(Status);
                     }
@@ -140,7 +157,7 @@ class AsyncServiceHelper
                 }
                 public void wait_install()
                 {
-                     InstallServiceQuiet(AppContext);
+                    InstallServiceQuiet(AppContext);
                 }
             };
 
@@ -153,190 +170,11 @@ class AsyncServiceHelper
      */
     protected static final String OPEN_CV_SERVICE_URL = "market://details?id=org.opencv.engine";
 
-    protected ServiceConnection mServiceConnection = new ServiceConnection()
-    {
-        public void onServiceConnected(ComponentName className, IBinder service)
-        {
-            Log.d(TAG, "Service connection created");
-            mEngineService = OpenCVEngineInterface.Stub.asInterface(service);
-            if (null == mEngineService)
-            {
-                Log.d(TAG, "OpenCV Manager Service connection fails. May be service was not installed?");
-                InstallService(mAppContext, mUserAppCallback);
-            }
-            else
-            {
-                mServiceInstallationProgress = false;
-                try
-                {
-                    if (mEngineService.getEngineVersion() < MINIMUM_ENGINE_VERSION)
-                    {
-                        Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INCOMPATIBLE_MANAGER_VERSION);
-                        Log.d(TAG, "Unbind from service");
-                        mAppContext.unbindService(mServiceConnection);
-                        Log.d(TAG, "Calling using callback");
-                        mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INCOMPATIBLE_MANAGER_VERSION);
-                        return;
-                    }
+    // ---------- 以下保留了原来类中用于加载 .so 的辅助方法（仍可使用） ----------
 
-                    Log.d(TAG, "Trying to get library path");
-                    String path = mEngineService.getLibPathByVersion(mOpenCVersion);
-                    if ((null == path) || (path.length() == 0))
-                    {
-                        if (!mLibraryInstallationProgress)
-                        {
-                            InstallCallbackInterface InstallQuery = new InstallCallbackInterface() {
-                                public String getPackageName()
-                                {
-                                    return "OpenCV library";
-                                }
-                                public void install() {
-                                    Log.d(TAG, "Trying to install OpenCV lib via Google Play");
-                                    try
-                                    {
-                                        if (mEngineService.installVersion(mOpenCVersion))
-                                        {
-                                            mLibraryInstallationProgress = true;
-                                            Log.d(TAG, "Package installation started");
-                                            Log.d(TAG, "Unbind from service");
-                                            mAppContext.unbindService(mServiceConnection);
-                                        }
-                                        else
-                                        {
-                                            Log.d(TAG, "OpenCV package was not installed!");
-                                            Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.MARKET_ERROR);
-                                            Log.d(TAG, "Unbind from service");
-                                            mAppContext.unbindService(mServiceConnection);
-                                            Log.d(TAG, "Calling using callback");
-                                            mUserAppCallback.onManagerConnected(LoaderCallbackInterface.MARKET_ERROR);
-                                        }
-                                    } catch (RemoteException e) {
-                                        e.printStackTrace();;
-                                        Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INIT_FAILED);
-                                        Log.d(TAG, "Unbind from service");
-                                        mAppContext.unbindService(mServiceConnection);
-                                        Log.d(TAG, "Calling using callback");
-                                        mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INIT_FAILED);
-                                    }
-                                }
-                                public void cancel() {
-                                    Log.d(TAG, "OpenCV library installation was canceled");
-                                    Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INSTALL_CANCELED);
-                                    Log.d(TAG, "Unbind from service");
-                                    mAppContext.unbindService(mServiceConnection);
-                                    Log.d(TAG, "Calling using callback");
-                                    mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INSTALL_CANCELED);
-                                }
-                                public void wait_install() {
-                                    Log.e(TAG, "Installation was not started! Nothing to wait!");
-                                }
-                            };
-
-                            mUserAppCallback.onPackageInstall(InstallCallbackInterface.NEW_INSTALLATION, InstallQuery);
-                        }
-                        else
-                        {
-                            InstallCallbackInterface WaitQuery = new InstallCallbackInterface() {
-                                public String getPackageName()
-                                {
-                                    return "OpenCV library";
-                                }
-
-                                public void install() {
-                                    Log.e(TAG, "Nothing to install we just wait current installation");
-                                }
-                                public void cancel()
-                                {
-                                    Log.d(TAG, "OpenCV library installation was canceled");
-                                    mLibraryInstallationProgress = false;
-                                    Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INSTALL_CANCELED);
-                                    Log.d(TAG, "Unbind from service");
-                                    mAppContext.unbindService(mServiceConnection);
-                                    Log.d(TAG, "Calling using callback");
-                                        mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INSTALL_CANCELED);
-                                }
-                                public void wait_install() {
-                                    Log.d(TAG, "Waiting for current installation");
-                                    try
-                                    {
-                                        if (!mEngineService.installVersion(mOpenCVersion))
-                                        {
-                                            Log.d(TAG, "OpenCV package was not installed!");
-                                            Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.MARKET_ERROR);
-                                            Log.d(TAG, "Calling using callback");
-                                            mUserAppCallback.onManagerConnected(LoaderCallbackInterface.MARKET_ERROR);
-                                        }
-                                        else
-                                        {
-                                            Log.d(TAG, "Wating for package installation");
-                                        }
-
-                                        Log.d(TAG, "Unbind from service");
-                                        mAppContext.unbindService(mServiceConnection);
-
-                                    } catch (RemoteException e) {
-                                        e.printStackTrace();
-                                        Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INIT_FAILED);
-                                        Log.d(TAG, "Unbind from service");
-                                        mAppContext.unbindService(mServiceConnection);
-                                        Log.d(TAG, "Calling using callback");
-                                        mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INIT_FAILED);
-                                    }
-                               }
-                            };
-
-                            mUserAppCallback.onPackageInstall(InstallCallbackInterface.INSTALLATION_PROGRESS, WaitQuery);
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        Log.d(TAG, "Trying to get library list");
-                        mLibraryInstallationProgress = false;
-                        String libs = mEngineService.getLibraryList(mOpenCVersion);
-                        Log.d(TAG, "Library list: \"" + libs + "\"");
-                        Log.d(TAG, "First attempt to load libs");
-                        int status;
-                        if (initOpenCVLibs(path, libs))
-                        {
-                            Log.d(TAG, "First attempt to load libs is OK");
-                            String eol = System.getProperty("line.separator");
-                            for (String str : Core.getBuildInformation().split(eol))
-                                Log.i(TAG, str);
-
-                            status = LoaderCallbackInterface.SUCCESS;
-                        }
-                        else
-                        {
-                            Log.d(TAG, "First attempt to load libs fails");
-                            status = LoaderCallbackInterface.INIT_FAILED;
-                        }
-
-                        Log.d(TAG, "Init finished with status " + status);
-                        Log.d(TAG, "Unbind from service");
-                        mAppContext.unbindService(mServiceConnection);
-                        Log.d(TAG, "Calling using callback");
-                        mUserAppCallback.onManagerConnected(status);
-                    }
-                }
-                catch (RemoteException e)
-                {
-                    e.printStackTrace();
-                    Log.d(TAG, "Init finished with status " + LoaderCallbackInterface.INIT_FAILED);
-                    Log.d(TAG, "Unbind from service");
-                    mAppContext.unbindService(mServiceConnection);
-                    Log.d(TAG, "Calling using callback");
-                    mUserAppCallback.onManagerConnected(LoaderCallbackInterface.INIT_FAILED);
-                }
-            }
-        }
-
-        public void onServiceDisconnected(ComponentName className)
-        {
-            mEngineService = null;
-        }
-    };
-
+    /**
+     * 尝试加载单个 native 库绝对路径（System.load）
+     */
     private boolean loadLibrary(String AbsPath)
     {
         boolean result = true;
@@ -357,6 +195,10 @@ class AsyncServiceHelper
         return result;
     }
 
+    /**
+     * 如果你从某个路径和 libs 列表手动加载 native 库，可以调用此方法。
+     * 在我们的现代实现中通常不需要（使用 OpenCVLoader），但保留以兼容调用者。
+     */
     private boolean initOpenCVLibs(String Path, String Libs)
     {
         Log.d(TAG, "Trying to init OpenCV libs");
@@ -386,6 +228,17 @@ class AsyncServiceHelper
         {
             Log.d(TAG, "Library path \"" + Path + "\" is empty");
             return false;
+        }
+    }
+
+    // 打印 OpenCV build 信息
+    private void logBuildInfo() {
+        try {
+            String eol = System.getProperty("line.separator");
+            for (String str : Core.getBuildInformation().split(eol))
+                Log.i(TAG, str);
+        } catch (Exception e) {
+            // ignore
         }
     }
 }

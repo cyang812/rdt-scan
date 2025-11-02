@@ -33,9 +33,9 @@ import android.media.ImageReader;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.text.Html;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -869,11 +869,15 @@ public class ImageQualityView extends LinearLayout implements View.OnClickListen
      */
     @Override
     public void onClick(View view) {
-        switch (view.getId()) {
-            case R.id.img_quality_check_viewport: {
-                updateRepeatingRequest();
-                break;
-            }
+//        switch (view.getId()) {
+//            case R.id.img_quality_check_viewport: {
+//                updateRepeatingRequest();
+//                break;
+//            }
+//        }
+        int id = view.getId();
+        if (id == R.id.img_quality_check_viewport) {
+            updateRepeatingRequest();
         }
     }
 

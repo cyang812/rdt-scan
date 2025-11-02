@@ -7,7 +7,7 @@
   ~ of a BSD-style license that can be found in the LICENSE file.
   -->
 
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -182,4 +182,4 @@
         app:layout_constraintStart_toEndOf="@+id/RDTImageView"
         app:layout_constraintTop_toBottomOf="@+id/TimeTextView"
         app:srcCompat="@color/common_google_signin_btn_text_dark_focused" />
-</android.support.constraint.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

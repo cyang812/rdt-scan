@@ -14,7 +14,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.support.v7.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.RadioButton;
@@ -104,24 +104,19 @@ public class SettingsDialogFragment extends DialogFragment
 
     /**
      * Update the language settings based on radio button selection
-     * @param radioGroup: the radio group
-     * @param i: the ID of the element that was selected
+     * @param radioGroup the radio group
+     * @param i the ID of the element that was selected
      */
     @Override
     public void onCheckedChanged(RadioGroup radioGroup, int i) {
-        switch (i) {
-            case R.id.enButton:
-                Constants.LANGUAGE = "en";
-                break;
-            case R.id.frButton:
-                Constants.LANGUAGE = "fr";
-                break;
-            case R.id.bmButton:
-                Constants.LANGUAGE = "bm";
-                break;
-            default:
-                Constants.LANGUAGE = "en";
-                break;
+        if (i == R.id.enButton) {
+            Constants.LANGUAGE = "en";
+        } else if (i == R.id.frButton) {
+            Constants.LANGUAGE = "fr";
+        } else if (i == R.id.bmButton) {
+            Constants.LANGUAGE = "bm";
+        } else {
+            Constants.LANGUAGE = "en";
         }
     }
 
