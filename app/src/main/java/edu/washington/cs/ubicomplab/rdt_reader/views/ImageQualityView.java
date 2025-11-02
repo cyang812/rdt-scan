@@ -869,11 +869,15 @@ public class ImageQualityView extends LinearLayout implements View.OnClickListen
      */
     @Override
     public void onClick(View view) {
-        switch (view.getId()) {
-            case R.id.img_quality_check_viewport: {
-                updateRepeatingRequest();
-                break;
-            }
+//        switch (view.getId()) {
+//            case R.id.img_quality_check_viewport: {
+//                updateRepeatingRequest();
+//                break;
+//            }
+//        }
+        int id = view.getId();
+        if (id == R.id.img_quality_check_viewport) {
+            updateRepeatingRequest();
         }
     }
 

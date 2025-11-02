@@ -178,15 +178,23 @@ public class MainActivity extends AppCompatActivity implements
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_settings:
-                // Go to the settings page
-                SettingsDialogFragment dialog = new SettingsDialogFragment();
-                dialog.show(getFragmentManager(), "Setting Dialog");
-                return true;
-            default:
-                return false;
+//        switch (item.getItemId()) {
+//            case R.id.action_settings:
+//                // Go to the settings page
+//                SettingsDialogFragment dialog = new SettingsDialogFragment();
+//                dialog.show(getFragmentManager(), "Setting Dialog");
+//                return true;
+//            default:
+//                return false;
+//        }
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            // Go to the settings page
+            SettingsDialogFragment dialog = new SettingsDialogFragment();
+            dialog.show(getFragmentManager(), "Setting Dialog");
+            return true;
         }
+        return false;
     }
 
     /**
