@@ -3,8 +3,7 @@
 buildscript {
     
     repositories {
-        maven { url "https://mirrors.tencent.com/nexus/repository/maven-public/" }
-        maven { url "https://maven.google.com" }
+        google()
         mavenCentral()
     }
     dependencies {
@@ -18,8 +17,7 @@ buildscript {
 
 allprojects {
     repositories {
-        maven { url "https://mirrors.tencent.com/nexus/repository/maven-public/" }
-        maven { url "https://maven.google.com" }
+        google()
         mavenCentral()
         maven { url "https://jitpack.io" }
     }
